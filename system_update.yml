@@ -1,0 +1,34 @@
+---
+- hosts: all
+  become: yes
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python
+
+  tasks:
+    - name: Checks if there is an update available from update server.
+      ansible.builtin.command: /usr/bin/midclt call update.check_available
+      register: truenas_midclt
+      changed_when: (truenas_midclt.stdout | from_json).status == "AVAILABLE"
+
+    - name: Downloads (if not already in cache) and apply an update.
+      ansible.builtin.command: /usr/bin/midclt call update.update
+      when: >
+        (truenas_midclt.stdout | from_json).status == "AVAILABLE"
+
+    - name: Wait for update to finish.
+      ansible.builtin.command: /usr/bin/midclt call update.check_available
+      register: truenas_midclt
+      when: >
+        (truenas_midclt.stdout | from_json).status == "AVAILABLE" or
+        (truenas_midclt.stdout | from_json).status == "REBOOT_REQUIRED"
+      until: (truenas_midclt.stdout | from_json).status == "REBOOT_REQUIRED"
+      retries: 60
+      delay: 30
+
+    - name: Reboot host.
+      ansible.builtin.reboot:
+        reboot_command: /usr/sbin/reboot
+      when: >
+        truenas_midclt.stdout is defined and
+        (truenas_midclt.stdout | from_json).status == "REBOOT_REQUIRED"
