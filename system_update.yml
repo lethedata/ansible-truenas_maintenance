@@ -2,9 +2,6 @@
 - hosts: all
   become: yes
 
-  vars:
-    ansible_python_interpreter: /usr/bin/python
-
   tasks:
     - name: Checks if there is an update available from update server.
       ansible.builtin.command: /usr/bin/midclt call update.check_available
@@ -23,6 +20,7 @@
         (truenas_midclt.stdout | from_json).status == "AVAILABLE" or
         (truenas_midclt.stdout | from_json).status == "REBOOT_REQUIRED"
       until: (truenas_midclt.stdout | from_json).status == "REBOOT_REQUIRED"
+      # Retry every 30 seconds for 30 minutes
       retries: 60
       delay: 30
 
