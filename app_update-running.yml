@@ -30,7 +30,7 @@
       ansible.builtin.pause:
         seconds: 3
 
-    - name: Wait for updates to complete.
+    - name: Wait for app updates to finish.
       command: >
         /usr/bin/midclt call app.query
         '[["state","=","RUNNING"]]'
@@ -43,3 +43,4 @@
       # Check every 15 seconds for 30 minutes
       retries: 120 
       delay: 15
+      changed_when: false

@@ -23,6 +23,7 @@
       # Retry every 30 seconds for 30 minutes
       retries: 60
       delay: 30
+      changed_when: false
 
     - name: Reboot host.
       ansible.builtin.reboot:
