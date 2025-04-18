@@ -1,0 +1,45 @@
+---
+- hosts: all
+  become: yes
+
+  tasks:
+    - name: Register running_apps.
+      ansible.builtin.command: >
+        /usr/bin/midclt call app.query
+        '[["state","=","RUNNING"]]'
+        '{"order_by": ["name"],
+        "select": ["name", "state", "upgrade_available"]}'
+      register: running_apps
+      changed_when: >
+        true in
+        (running_apps.stdout | from_json | json_query('[].upgrade_available'))
+
+    - name: End play if no apps need to be updated.
+      ansible.builtin.meta: end_play
+      when: not running_apps.changed
+
+    - name: Start update jobs for apps running with update.
+      ansible.builtin.command: >
+        /usr/bin/midclt call app.upgrade 
+        "{{ item.name }}"
+      when: item.upgrade_available == true
+      loop: "{{ running_apps.stdout }}"
+      register: loop_result
+
+    - name: Pause to allow jobs to start processing.
+      ansible.builtin.pause:
+        seconds: 3
+
+    - name: Wait for updates to complete.
+      command: >
+        /usr/bin/midclt call app.query
+        '[["state","=","RUNNING"]]'
+        '{"order_by": ["name"],
+        "select": ["name", "state", "upgrade_available"]}'
+      register: update_status
+      until: >
+        (update_status.stdout | from_json | json_query('[].name')) ==
+        (running_apps.stdout | from_json | json_query('[].name'))
+      # Check every 15 seconds for 30 minutes
+      retries: 120 
+      delay: 15
